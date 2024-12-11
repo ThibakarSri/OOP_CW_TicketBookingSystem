@@ -20,17 +20,19 @@ public class TicketPool {
     // Vendor who is the Producer will call the addTicket() method
     public synchronized void addTicket(Ticket ticket) {
         while (ticketQueue.size() >= maximumTicketCapacity) {
-            System.out.println("The ticket pool is full so vendors are waiting for add tickets...");
+            Logger.log("The ticket pool is full so vendors are waiting to add tickets...");
             try {
                 wait();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); // Reset thread's interrupted status
-                throw new RuntimeException("Vendor thread interrupted while waiting: " + e.getMessage());
+                Logger.log("Vendor interrupted while waiting: " + e.getMessage());
+                throw new RuntimeException(e);
             }
         }
         ticketQueue.add(ticket);
         notifyAll(); // Notify all waiting threads when the condition changes
-        System.out.println("Ticket added by - " + Thread.currentThread().getName() + " - current size is - " + ticketQueue.size());
+        //System.out.println("Ticket added by - " + Thread.currentThread().getName() + " - current size is - " + ticketQueue.size());
+        Logger.log("Ticket added to the pool - current size is - " + ticketQueue.size());
     }
 
     // Customer who is the Consumer will call the buyTicket() method
@@ -41,13 +43,15 @@ public class TicketPool {
                 wait(); // If queue is empty, customers wait
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); // Reset thread's interrupted status
-                throw new RuntimeException("Customers thread interrupted while waiting: " + e.getMessage());
+                Logger.log("Customer interrupted while waiting: " + e.getMessage());
+                throw new RuntimeException(e);
             }
         }
 
         Ticket ticket = ticketQueue.poll();
         notifyAll(); // Notify all waiting threads when the condition changes
-        System.out.println("Ticket bought by - " + Thread.currentThread().getName() + " - current size is - " + ticketQueue.size() + " - Ticket is - " + ticket);
+        //System.out.println("Ticket bought by - " + Thread.currentThread().getName() + " - current size is - " + ticketQueue.size() + " - Ticket is - " + ticket);
+        Logger.log("Ticket bought from the pool - current size is - " + ticketQueue.size());
         return ticket;
     }
 

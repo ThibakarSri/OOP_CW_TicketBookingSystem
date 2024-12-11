@@ -1,6 +1,7 @@
 package com.project.ticketbookingsystem.JavaCLI;
 
 import com.google.gson.Gson;
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import java.util.ArrayList;
@@ -14,24 +15,29 @@ public class Main {
     private static final String FILENAME = "configs.json";
 
     public static void main(String[] args) {
+        while (true) {
+            System.out.println("||-----------------------------------------------------------------||");
+            System.out.println("|----------------------Ticket Booking System------------------------|");
+            System.out.println("||-----------------------------------------------------------------||");
+            // Load or Create Configuration
+            Configuration configuration = loadOrCreateConfiguration();
 
+            // Initialize TicketPool
+            TicketPool ticketPool = new TicketPool(configuration.getMaxTicketCapacity());
 
-        System.out.println("||-----------------------------------------------------------------||");
-        System.out.println("|----------------------Ticket Booking System------------------------|");
-        System.out.println("||-----------------------------------------------------------------||");
-        // Load or Create Configuration
-        Configuration configuration = loadOrCreateConfiguration();
+            // Create threads for vendors and customers
+            List<Thread> threads = createThreads(configuration, ticketPool);
 
-        // Initialize TicketPool
-        TicketPool ticketPool = new TicketPool(configuration.getMaxTicketCapacity());
+            // Control the simulation interactively
+            controlSimulation(threads, configuration, ticketPool);
 
-        // Create threads for vendors and customers
-        List<Thread> threads = createThreads(configuration, ticketPool);
-
-        // Control the simulation interactively
-        controlSimulation(threads);
-
-        System.out.println("Ticketing system terminated.");
+            System.out.println("Do you want to restart the system? (Yes to restart / No to exit):");
+            String restartCommand = scanner.nextLine().trim().toLowerCase();
+            if (!restartCommand.equals("yes")) {
+                System.out.println("Exiting Ticketing System...");
+                System.exit(0);
+            }
+        }
     }
 
     // Section 1: Load or Create Configuration
@@ -62,13 +68,15 @@ public class Main {
 
         // Prompt for user input to create a new configuration
         System.out.println("Please configure the system:");
+        configuration.setEventName(promptString("Enter the event name:"));
+        configuration.setTicketPrice(promptDouble("Enter the ticket price:", 1.0, 10000.0));
         configuration.setTotalTickets(promptInt("Enter total number of tickets:", 1, 1000));
         configuration.setTicketReleaseRate(promptInt("Enter ticket release rate (seconds):", 1, 10));
         configuration.setCustomerRetrievalRate(promptInt("Enter customer retrieval rate (seconds):", 1, 10));
-        configuration.setMaxTicketCapacity(promptInt("Enter maximum ticket capacity:", 1, 1000));
-        configuration.setNumVendors(promptInt("Enter the number of vendors:", 1, 10));
-        configuration.setNumCustomers(promptInt("Enter the number of customers:", 1, 10));
-        configuration.setMaxTicketsPerCustomer(promptInt("Enter the maximum number of tickets each customer can buy:", 1, configuration.getTotalTickets()));
+        configuration.setMaxTicketCapacity(promptInt("Enter maximum ticket capacity:", 1, 10000));
+        configuration.setNumVendors(promptInt("Enter the number of vendors:", 1, 100));
+        configuration.setNumCustomers(promptInt("Enter the number of customers:", 1, 100));
+        configuration.setTicketsPerCustomer(promptInt("Enter the number of tickets each customer can buy:", 1, configuration.getTotalTickets()));
 
         // Ask if the user wants to save the configuration
         System.out.println("Do you want to save the configuration? (Yes/No)");
@@ -79,6 +87,7 @@ public class Main {
             } catch (Exception ignored) {
                 System.out.println("Failed to load configurations. Starting fresh.");
                 // If the file doesn't exist, start with an empty list
+                configurations = new ArrayList<>();
             }
             configurations.add(configuration);
             saveConfigurations(configurations);
@@ -96,7 +105,9 @@ public class Main {
             Thread vendorThread = new Thread(new Vendor(
                     configuration.getTotalTickets() / configuration.getNumVendors(),
                     configuration.getTicketReleaseRate(),
-                    ticketPool), "Vendor-" + i);
+                    ticketPool,
+                    configuration.getEventName(),
+                    configuration.getTicketPrice()), "Vendor-" + i);
             threads.add(vendorThread);
         }
 
@@ -105,7 +116,7 @@ public class Main {
             Thread customerThread = new Thread(new Customer(
                     ticketPool,
                     configuration.getCustomerRetrievalRate(),
-                    configuration.getMaxTicketsPerCustomer()), // Maximum tickets per customer
+                    configuration.getTicketsPerCustomer()), // Maximum tickets per customer
                     "Customer-" + i);
             threads.add(customerThread);
         }
@@ -114,8 +125,9 @@ public class Main {
     }
 
     // Section 3: Control Simulation
-    private static void controlSimulation(List<Thread> threads) {
-        System.out.println("Enter 'start' to begin or 'stop' to terminate the process:");
+    private static void controlSimulation(List<Thread> threads, Configuration configuration, TicketPool ticketPool) {
+        System.out.println("Enter 'start' to begin, 'stop' to terminate the simulation, or 'exit' to quit:");
+
         while (true) {
             String command = scanner.nextLine().trim().toLowerCase();
             if (command.equals("start")) {
@@ -128,8 +140,12 @@ public class Main {
                 isRunning = false;
                 System.out.println("Stopping ticket handling process...");
                 break;
+            } else if (command.equals("exit")) {
+                isRunning = false;
+                System.out.println("Exiting the system...");
+                System.exit(0);
             } else {
-                System.out.println("Invalid command. Please enter 'start' or 'stop'.");
+                System.out.println("Invalid command. Please enter 'start', 'stop', or 'exit'.");
             }
         }
 
@@ -141,6 +157,13 @@ public class Main {
                 System.out.println("Thread execution interrupted: " + e.getMessage());
             }
         }
+
+        // Display summary after stopping
+        System.out.println("Simulation Summary:");
+        System.out.println("Event Name: " + configuration.getEventName());
+        System.out.println("Ticket Price: " + configuration.getTicketPrice());
+        System.out.println("Total Tickets Sold: " + (configuration.getTotalTickets() - ticketPool.getTicketQueueSize()));
+        System.out.println("Remaining Tickets: " + ticketPool.getTicketQueueSize());
     }
 
     // Section 4: Save Configurations
@@ -169,9 +192,30 @@ public class Main {
         return value;
     }
 
+    // Helper: Prompt for String Input
+    private static String promptString(String message) {
+        System.out.print(message + " ");
+        return scanner.nextLine().trim();
+    }
+
+    // Helper: Prompt for Double Input
+    private static double promptDouble(String message, double min, double max) {
+        double value;
+        while (true) {
+            System.out.print(message + " ");
+            try {
+                value = Double.parseDouble(scanner.nextLine().trim());
+                if (value >= min && value <= max) break;
+                else System.out.println("Value must be between " + min + " and " + max + ".");
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Please enter a valid number.");
+            }
+        }
+        return value;
+    }
+
     // Helper: Check if System is Running
     public static boolean isRunning() {
         return isRunning;
     }
 }
-

@@ -31,12 +31,14 @@ public class Customer implements Runnable {
     public void run() {
         for (int i = 0; i < maxQuantity  && Main.isRunning(); i++) {
             Ticket ticket = ticketPool.buyTicket();
+            Logger.log("Ticket bought by - " + Thread.currentThread().getName() + " - current size is - " + ticketPool.getTicketQueueSize() + " - Ticket is - " + ticket);
             //System.out.println("Ticket purchased by - " + Thread.currentThread().getName() + ": " + ticket);
             try {
-                Thread.sleep(customerRetrievalRate * 2000L);
+                Thread.sleep(customerRetrievalRate * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                System.out.println("Customer interrupted.");
+                //System.out.println("Customer interrupted.");
+                Logger.log("Customer interrupted: " + Thread.currentThread().getName());
             }
         }
     }
